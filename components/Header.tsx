@@ -79,7 +79,7 @@ const OTPInput = ({
       {[...Array(length)].map((_, idx) => (
         <input
           key={idx}
-          ref={(el) => (inputsRef.current[idx] = el)}
+          ref={(el) => { inputsRef.current[idx] = el; }}
           type="text"
           maxLength={1}
           value={value[idx] || ""}
