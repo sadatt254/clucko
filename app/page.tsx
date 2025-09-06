@@ -126,7 +126,7 @@ export default function Home() {
               Create Mission
             </Button>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 bg-[#0E0F0E] p-4 rounded-xl">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 rounded-xl">
             {missions.map((mission, index) => (
               <Card
                 key={index}
