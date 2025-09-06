@@ -1,6 +1,13 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import Providers from "@/contexts/PrivyProviderWrapper";
+import { Outfit } from 'next/font/google';
+
+    const outfit = Outfit({
+      subsets: ['latin'], // Specify the character subsets you need
+      variable: '--font-outfit', // Declare a CSS variable for your font
+    });
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -23,11 +30,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" className={`${outfit.variable} font-sans`}>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        {children}
+        <Providers>
+          {children}
+        </Providers>
       </body>
     </html>
   );
