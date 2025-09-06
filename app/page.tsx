@@ -1,4 +1,4 @@
-"use client";
+"use client"
 
 import { Header } from "@/components/Header";
 import Image from "next/image";
@@ -105,7 +105,7 @@ export default function Home() {
   };
 
   return (
-    <div className="bg-[#0e0f11f2] font-sans relative min-h-screen p-6">
+    <div className="bg-[#0e0f11f2] font-sans relative min-h-screen p-2 sm:p-6">
       <Header />
       <main className="flex flex-col items-center justify-center w-full flex-1 pt-24 md:pt-28">
         <div className="w-full mx-5 px-4 sm:px-6 lg:px-8">
