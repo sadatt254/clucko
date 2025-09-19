@@ -1,7 +1,6 @@
-"use client"
+"use client";
 
 import { Header } from "@/components/Header";
-import Image from "next/image";
 import { Wheat, Plus } from "lucide-react";
 import {
   Card,
@@ -14,8 +13,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useState } from "react";
+import { useState, ChangeEvent, FormEvent } from "react";
+import { useMissionManagement } from "@/hooks/GetMissions";
 
 const Modal = ({
   children,
@@ -43,66 +42,71 @@ const Modal = ({
 };
 
 export default function Home() {
-  // Sample mission data with state
-  const [missions, setMissions] = useState([
-    {
-      title: "Provide Liquidity on Hyperion",
-      subtitle: "Add Liquidity to any pool on Hyperion",
-      protocolLogo: "/hyperion-logo.svg",
-      feeds: 100,
-      isActive: true,
-    },
-    {
-      title: "Stake Tokens on Aave",
-      subtitle: "Stake assets in Aave protocol",
-      protocolLogo: "/aave-logo.svg",
-      feeds: 150,
-      isActive: false,
-    },
-    {
-      title: "Vote on Compound",
-      subtitle: "Participate in Compound governance",
-      protocolLogo: "/compound-logo.svg",
-      feeds: 80,
-      isActive: true,
-    },
-    {
-      title: "Swap on Uniswap",
-      subtitle: "Execute trades on Uniswap",
-      protocolLogo: "/uniswap-logo.svg",
-      feeds: 120,
-      isActive: true,
-    },
-  ]);
+  // Wagmi custom hook integration
+  const {
+    missions,
+    isMissionsLoading,
+    missionsError,
+    refetchMissions,
+    createMission,
+    isPending,
+    txHash,
+    error,
+  } = useMissionManagement();
 
-  // State for create mission modal
+  // Modal state for create mission
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  // State for form values
   const [newMission, setNewMission] = useState({
-    title: "",
-    subtitle: "",
-    protocolLogo: "",
-    feeds: "",
-    isActive: "true",
+    missionName: "",
+    missionDescription: "",
+    targetContract: "",
+    rewardAmount: "",
+    feedsToken: "",
   });
+  const [abiText, setAbiText] = useState("");
 
-  const handleCreateMission = () => {
-    if (!newMission.title || !newMission.subtitle || !newMission.protocolLogo || !newMission.feeds) {
+  function handleAbiFileUpload(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = evt => setAbiText((evt.target?.result as string) || "");
+    reader.readAsText(file);
+  }
+
+  async function handleCreateMission(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (
+      !newMission.missionName ||
+      !newMission.missionDescription ||
+      !newMission.targetContract ||
+      !newMission.rewardAmount ||
+      !newMission.feedsToken
+    ) {
       alert("Please fill in all fields");
       return;
     }
-    setMissions([
-      ...missions,
-      {
-        title: newMission.title,
-        subtitle: newMission.subtitle,
-        protocolLogo: newMission.protocolLogo,
-        feeds: parseInt(newMission.feeds),
-        isActive: newMission.isActive === "true",
-      },
-    ]);
-    setNewMission({ title: "", subtitle: "", protocolLogo: "", feeds: "", isActive: "true" });
-    setIsCreateModalOpen(false);
-  };
+    try {
+      await createMission(
+        newMission.missionName,
+        newMission.missionDescription,
+        newMission.targetContract as `0x${string}`,
+        BigInt(newMission.rewardAmount),
+        newMission.feedsToken as `0x${string}`
+      );
+      setNewMission({
+        missionName: "",
+        missionDescription: "",
+        targetContract: "",
+        rewardAmount: "",
+        feedsToken: "",
+      });
+      setIsCreateModalOpen(false);
+      await refetchMissions(); // Refresh mission list after new mission
+    } catch (err) {
+      alert(`Error creating mission: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
 
   return (
     <div className="bg-[#0e0f11f2] font-sans relative min-h-screen p-2 sm:p-6">
@@ -126,128 +130,181 @@ export default function Home() {
               Create Mission
             </Button>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 rounded-xl">
-            {missions.map((mission, index) => (
-              <Card
-                key={index}
-                className="relative bg-[#151515] rounded-2xl border-transparent text-muted-foreground flex flex-col h-64"
-              >
-                <CardHeader>
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <CardTitle className="text-xl sm:text-2xl mb-2 text-white">
-                        {mission.title}
-                      </CardTitle>
-                      <CardDescription className="text-sm">
-                        {mission.subtitle}
-                      </CardDescription>
+          {isMissionsLoading ? (
+            <div className="py-8 text-center text-lg text-muted-foreground">
+              Loading missions...
+            </div>
+          ) : missionsError ? (
+            <div className="py-8 text-center text-red-400">
+              Error loading missions: {String(missionsError.message || missionsError)}
+            </div>
+          ) : Array.isArray(missions) && missions.length ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 rounded-xl">
+              {missions.map((mission: any, index: number) => (
+                <Card
+                  key={mission.id || index}
+                  className="relative bg-[#151515] rounded-2xl border-transparent text-muted-foreground flex flex-col h-64"
+                >
+                  <CardHeader>
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <CardTitle className="text-xl sm:text-2xl mb-2 text-white">
+                          {mission.missionName}
+                        </CardTitle>
+                        <CardDescription className="text-sm">
+                          {mission.missionDescription}
+                        </CardDescription>
+                      </div>
+                      <Badge
+                        className={mission.isActive ? "bg-green-900 text-green-300" : "bg-red-900 text-red-300"}
+                      >
+                        {mission.isActive ? "Active" : "Inactive"}
+                      </Badge>
                     </div>
-                    <Badge
-                      className={mission.isActive ? "bg-green-900 text-green-300" : "bg-red-900 text-red-300"}
+                  </CardHeader>
+                  <CardFooter className="flex justify-between items-center mt-auto">
+                    <div className="flex items-center gap-2">
+                      <div className="relative">
+                        {/* You may update this image logic if missions include logos */}
+                        <img
+                          src="/logo.svg"
+                          alt={`${mission.missionName} logo`}
+                          className="h-8 w-8 rounded-full object-contain"
+                        />
+                      </div>
+                      <div className="flex items-center gap-1 text-[#65ec72] font-medium">
+                        <Wheat className="size-4" />
+                        {String(mission.rewardAmount)} Feeds
+                      </div>
+                    </div>
+                    <Button
+                      className="bg-[#65EC72] text-[#171617] hover:bg-green-700 rounded-full"
                     >
-                      {mission.isActive ? "Active" : "Inactive"}
-                    </Badge>
-                  </div>
-                </CardHeader>
-                <CardFooter className="flex justify-between items-center mt-auto">
-                  <div className="flex items-center gap-2">
-                    <div className="relative">
-                      <img
-                        src={mission.protocolLogo}
-                        alt={`${mission.title} logo`}
-                        className="h-8 w-8 rounded-full object-contain"
-                      />
-                    </div>
-                    <div className="flex items-center gap-1 text-[#65ec72] font-medium">
-                      <Wheat className="size-4" />
-                      {mission.feeds} Feeds
-                    </div>
-                  </div>
-                  <Button
-                    className="bg-[#65EC72] text-[#171617] hover:bg-green-700 rounded-full"
-                  >
-                    Start Mission
-                  </Button>
-                </CardFooter>
-              </Card>
-            ))}
-          </div>
+                      Start Mission
+                    </Button>
+                  </CardFooter>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <div className="py-8 text-center text-lg text-muted-foreground">
+              No missions found.
+            </div>
+          )}
         </div>
       </main>
 
-      {/* Create Mission Modal */}
+      {/* Create Mission Modal (unchanged) */}
       <Modal open={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)}>
-        <h2 className="text-xl font-semibold mb-4 text-white">Create New Mission</h2>
-        <div className="space-y-4">
-          <div>
-            <Label htmlFor="title" className="text-white">Title</Label>
-            <Input
-              id="title"
-              value={newMission.title}
-              onChange={(e) => setNewMission({ ...newMission, title: e.target.value })}
-              placeholder="e.g., Provide Liquidity on Hyperion"
-              className="bg-[#292e33] text-white border-[#3a3f45] placeholder:text-muted-foreground"
-            />
+        <h2 className="text-2xl font-bold mb-6 text-white text-center tracking-tight">
+          New Mission Setup
+        </h2>
+        <form className="space-y-6" onSubmit={handleCreateMission}>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <Label htmlFor="missionName" className="text-sm text-muted-foreground mb-1 block">
+                Mission Name
+              </Label>
+              <Input
+                id="missionName"
+                value={newMission.missionName}
+                onChange={e => setNewMission({ ...newMission, missionName: e.target.value })}
+                placeholder="e.g. Provide Liquidity on Hyperion"
+                className="bg-[#212127] border-[#32343a] rounded-xl text-lg py-3 px-4 placeholder:text-[#68697a] text-white focus:ring-[#65EC72]"
+              />
+            </div>
+            <div>
+              <Label htmlFor="targetContract" className="text-sm text-muted-foreground mb-1 block">
+                Target Contract Address
+              </Label>
+              <Input
+                id="targetContract"
+                value={newMission.targetContract}
+                onChange={e => setNewMission({ ...newMission, targetContract: e.target.value })}
+                placeholder="0xABC…123 - e.g. protocol pool"
+                className="bg-[#212127] border-[#32343a] rounded-xl text-lg py-3 px-4 placeholder:text-[#68697a] text-white focus:ring-[#65EC72]"
+              />
+            </div>
+            <div className="md:col-span-2">
+              <Label htmlFor="missionDescription" className="text-sm text-muted-foreground mb-1 block">
+                Mission Description
+              </Label>
+              <Input
+                id="missionDescription"
+                value={newMission.missionDescription}
+                onChange={e => setNewMission({ ...newMission, missionDescription: e.target.value })}
+                placeholder="Describe the mission clearly so users know what to do…"
+                className="bg-[#212127] border-[#32343a] rounded-xl text-lg py-3 px-4 placeholder:text-[#68697a] text-white focus:ring-[#65EC72]"
+              />
+            </div>
+            <div>
+              <Label htmlFor="rewardAmount" className="text-sm text-muted-foreground mb-1 block">
+                Reward Amount
+              </Label>
+              <Input
+                id="rewardAmount"
+                type="number"
+                value={newMission.rewardAmount}
+                min={0}
+                onChange={e => setNewMission({ ...newMission, rewardAmount: e.target.value })}
+                placeholder="e.g. 500"
+                className="bg-[#212127] border-[#32343a] rounded-xl text-lg py-3 px-4 placeholder:text-[#68697a] text-white focus:ring-[#65EC72]"
+              />
+            </div>
+            <div>
+              <Label htmlFor="feedsToken" className="text-sm text-muted-foreground mb-1 block">
+                Reward Token Address
+              </Label>
+              <Input
+                id="feedsToken"
+                value={newMission.feedsToken}
+                onChange={e => setNewMission({ ...newMission, feedsToken: e.target.value })}
+                placeholder="0xDEF…456 - e.g. FEEDS token"
+                className="bg-[#212127] border-[#32343a] rounded-xl text-lg py-3 px-4 placeholder:text-[#68697a] text-white focus:ring-[#65EC72]"
+              />
+            </div>
           </div>
           <div>
-            <Label htmlFor="subtitle" className="text-white">Subtitle</Label>
-            <Input
-              id="subtitle"
-              value={newMission.subtitle}
-              onChange={(e) => setNewMission({ ...newMission, subtitle: e.target.value })}
-              placeholder="e.g., Add Liquidity to any pool on Hyperion"
-              className="bg-[#292e33] text-white border-[#3a3f45] placeholder:text-muted-foreground"
+            <Label className="text-sm text-muted-foreground mb-1 block">
+              Contract ABI (Paste or Upload)
+            </Label>
+            <textarea
+              value={abiText}
+              onChange={e => setAbiText(e.target.value)}
+              placeholder='Paste contract ABI JSON here for contract interaction…'
+              rows={4}
+              className="bg-[#181820] border-[#32343a] text-white w-full rounded-xl p-4 placeholder:text-[#68697a] text-sm focus:ring-[#65EC72] mb-2"
             />
-          </div>
-          <div>
-            <Label htmlFor="protocolLogo" className="text-white">Protocol Logo URL</Label>
             <Input
-              id="protocolLogo"
-              value={newMission.protocolLogo}
-              onChange={(e) => setNewMission({ ...newMission, protocolLogo: e.target.value })}
-              placeholder="e.g., /hyperion-logo.svg"
-              className="bg-[#292e33] text-white border-[#3a3f45] placeholder:text-muted-foreground"
+              type="file"
+              accept=".json,.txt,application/json"
+              onChange={handleAbiFileUpload}
+              className="bg-[#181820] text-white border-none file:bg-[#65EC72] file:text-[#222] file:rounded-lg"
             />
-          </div>
-          <div>
-            <Label htmlFor="feeds" className="text-white">Feeds</Label>
-            <Input
-              id="feeds"
-              type="number"
-              value={newMission.feeds}
-              onChange={(e) => setNewMission({ ...newMission, feeds: e.target.value })}
-              placeholder="e.g., 100"
-              className="bg-[#292e33] text-white border-[#3a3f45] placeholder:text-muted-foreground"
-            />
-          </div>
-          <div>
-            <Label htmlFor="isActive" className="text-white">Status</Label>
-            <Select
-              value={newMission.isActive}
-              onValueChange={(value) => setNewMission({ ...newMission, isActive: value })}
-            >
-              <SelectTrigger className="bg-[#292e33] text-white border-[#3a3f45]">
-                <SelectValue placeholder="Select status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="true">Active</SelectItem>
-                <SelectItem value="false">Inactive</SelectItem>
-              </SelectContent>
-            </Select>
           </div>
           <Button
-            className="w-full bg-[#65EC72] text-[#171617] hover:bg-green-700 rounded-full"
-            onClick={handleCreateMission}
+            type="submit"
+            className="w-full mt-6 bg-[#65EC72] text-[#171617] font-bold text-lg rounded-full py-3 hover:bg-green-700 transition-colors"
+            disabled={isPending}
           >
-            Create Mission
+            {isPending ? "Creating..." : "Create Mission"}
           </Button>
+          {error && (
+            <div className="text-red-500 text-sm py-2">{String(error.message || error)}</div>
+          )}
+          {txHash && (
+            <div className="text-green-500 text-sm py-2">
+              Mission submitted! Tx: {txHash}
+            </div>
+          )}
           <Button
             className="w-full bg-transparent text-muted-foreground hover:text-white"
+            type="button"
             onClick={() => setIsCreateModalOpen(false)}
           >
             Cancel
           </Button>
-        </div>
+        </form>
       </Modal>
     </div>
   );

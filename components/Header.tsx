@@ -55,7 +55,7 @@ export const Header = ({ className }: { className?: string }) => {
       <nav
         className={cn(
           "w-full flex flex-col pt-4 px-20 fixed top-0 z-50 transition-all duration-300",
-          isScrolled && isMobile ? "bg-black/50 backdrop-blur-md" : "bg-transparent px-8",
+          isScrolled && isMobile ? "bg-black/50 backdrop-blur-md" : "bg-transparent",
           className
         )}
       >
